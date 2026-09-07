@@ -27,8 +27,8 @@ public:
   [[nodiscard]] char *ptr() const;
   [[nodiscard]] size_t len() const;
 
-  [[nodiscard]] StringView trim_left() const;
-  [[nodiscard]] StringView trim_right() const;
+  [[nodiscard]] StringView trim_start() const;
+  [[nodiscard]] StringView trim_end() const;
   [[nodiscard]] StringView trim() const;
 
   [[nodiscard]] bool contains(const StringView &pat) const;
@@ -82,7 +82,7 @@ char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
 
 /* --------------- Trim --------------- */
-StringView StringView::trim_left() const {
+StringView StringView::trim_start() const {
   StringView newSV(*this);
   while (newSV.len() && isspace(static_cast<unsigned char>(*newSV.ptr()))) {
     newSV.ptr_++;
@@ -90,7 +90,7 @@ StringView StringView::trim_left() const {
   }
   return newSV;
 }
-StringView StringView::trim_right() const {
+StringView StringView::trim_end() const {
   StringView newSV(*this);
   while (newSV.len() &&
          isspace(static_cast<unsigned char>(newSV.ptr()[newSV.len() - 1]))) {
@@ -98,7 +98,7 @@ StringView StringView::trim_right() const {
   }
   return newSV;
 }
-StringView StringView::trim() const { return trim_left().trim_right(); }
+StringView StringView::trim() const { return trim_start().trim_end(); }
 
 /* --------------- Pattern Matching --------------- */
 bool StringView::contains(const StringView &pat) const {
