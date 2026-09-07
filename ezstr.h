@@ -31,12 +31,12 @@ public:
   [[nodiscard]] StringView trim_right() const;
   [[nodiscard]] StringView trim() const;
 
-  [[nodiscard]] bool contains(const StringView &pat);
-  [[nodiscard]] bool contains(const char *pat);
-  [[nodiscard]] bool starts_with(const StringView &pat);
-  [[nodiscard]] bool starts_with(const char *pat);
-  [[nodiscard]] bool ends_with(const StringView &pat);
-  [[nodiscard]] bool ends_with(const char *pat);
+  [[nodiscard]] bool contains(const StringView &pat) const;
+  [[nodiscard]] bool contains(const char *pat) const;
+  [[nodiscard]] bool starts_with(const StringView &pat) const;
+  [[nodiscard]] bool starts_with(const char *pat) const;
+  [[nodiscard]] bool ends_with(const StringView &pat) const;
+  [[nodiscard]] bool ends_with(const char *pat) const;
 
 private:
   char *ptr_;
@@ -101,13 +101,30 @@ StringView StringView::trim_right() const {
 StringView StringView::trim() const { return trim_left().trim_right(); }
 
 /* --------------- Pattern Matching --------------- */
-#error todo
-bool contains(const StringView &pat);
-bool contains(const char *pat);
-bool starts_with(const StringView &pat);
-bool starts_with(const char *pat);
-bool ends_with(const StringView &pat);
-bool ends_with(const char *pat);
+bool StringView::contains(const StringView &pat) const {
+  if (pat.len() > len())
+    return false;
+  for (size_t i = 0; i <= len() - pat.len(); i++)
+    if (pat == StringView(ptr() + i, pat.len()))
+      return true;
+  return false;
+}
+bool StringView::contains(const char *pat) const {
+  return contains(StringView(const_cast<char *>(pat)));
+}
+bool StringView::starts_with(const StringView &pat) const {
+  return pat.len() <= len() && pat == StringView(ptr(), pat.len());
+}
+bool StringView::starts_with(const char *pat) const {
+  return starts_with(StringView(const_cast<char *>(pat)));
+}
+bool StringView::ends_with(const StringView &pat) const {
+  return pat.len() <= len() &&
+         pat == StringView(ptr() + len() - pat.len(), pat.len());
+}
+bool StringView::ends_with(const char *pat) const {
+  return ends_with(StringView(const_cast<char *>(pat)));
+}
 
 #endif // EZSTR_IMPL
 } // namespace ezstr
