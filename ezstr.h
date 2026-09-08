@@ -34,6 +34,9 @@ public:
 
   [[nodiscard]] char *ptr() const;
   [[nodiscard]] size_t len() const;
+  [[nodiscard]] bool is_empty() const;
+  [[nodiscard]] bool is_valid() const;
+  [[nodiscard]] explicit operator bool() const;
 
   [[nodiscard]] StringView trim_start() const;
   [[nodiscard]] StringView trim_end() const;
@@ -95,7 +98,7 @@ bool StringView::operator==(StringView other) const {
   if (len() != other.len())
     return false;
   for (size_t i = 0; i < len(); i++) {
-    if (ptr()[i] != other.ptr()[i])
+    if (ptr()[i] != other[i])
       return false;
   }
   return true;
@@ -104,10 +107,13 @@ const char &StringView::operator[](size_t i) const { return ptr()[i]; }
 const char *StringView::get(size_t i) const {
   return i < len() ? &ptr()[i] : nullptr;
 }
+StringView::operator bool() const { return !is_empty() && is_valid(); }
 
 /* --------------- Getters + KindaGetters --------------- */
 char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
+bool StringView::is_empty() const { return len() == 0; }
+bool StringView::is_valid() const { return ptr(); }
 
 /* --------------- Trim --------------- */
 StringView StringView::trim_start() const {
@@ -122,7 +128,7 @@ StringView StringView::trim() const { return trim_start().trim_end(); }
 StringView
 StringView::trim_start_matches(std::function<bool(char)> predicate) const {
   StringView newSV(*this);
-  while (newSV.len() && predicate(*newSV.ptr())) {
+  while (newSV.len() && predicate(newSV[0])) {
     newSV.ptr_++;
     newSV.len_--;
   }
@@ -131,7 +137,7 @@ StringView::trim_start_matches(std::function<bool(char)> predicate) const {
 StringView StringView::trim_start_matches(StringView chars) const {
   return trim_start_matches([chars](char c) {
     for (size_t i = 0; i < chars.len(); i++)
-      if (c == chars.ptr()[i])
+      if (c == chars[i])
         return true;
     return false;
   });
@@ -139,7 +145,7 @@ StringView StringView::trim_start_matches(StringView chars) const {
 StringView
 StringView::trim_end_matches(std::function<bool(char)> predicate) const {
   StringView newSV(*this);
-  while (newSV.len() && predicate(newSV.ptr()[newSV.len() - 1])) {
+  while (newSV.len() && predicate(newSV[newSV.len() - 1])) {
     newSV.len_--;
   }
   return newSV;
@@ -147,7 +153,7 @@ StringView::trim_end_matches(std::function<bool(char)> predicate) const {
 StringView StringView::trim_end_matches(StringView chars) const {
   return trim_end_matches([chars](char c) {
     for (size_t i = 0; i < chars.len(); i++)
-      if (c == chars.ptr()[i])
+      if (c == chars[i])
         return true;
     return false;
   });
