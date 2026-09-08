@@ -1,6 +1,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstring>
+#include <functional>
 
 #define DEV 1
 #if DEV
@@ -11,14 +12,19 @@
 #define EZSTR_H
 namespace ezstr {
 
+/* --------------- TODO --------------- */
+/* Split
+ * Trim Matches
+ */
+
 /* --------------- Definition --------------- */
 
 class StringView {
 public:
-  StringView(char *ptr, size_t len);
+  StringView(const char *ptr, size_t len);
   StringView(StringView &&other);
   StringView(const StringView &other);
-  StringView(char *ptr);
+  StringView(const char *ptr);
   StringView &operator=(StringView &&other);
   StringView &operator=(const StringView &other);
   [[nodiscard]] bool operator==(const StringView &other) const;
@@ -30,6 +36,16 @@ public:
   [[nodiscard]] StringView trim_start() const;
   [[nodiscard]] StringView trim_end() const;
   [[nodiscard]] StringView trim() const;
+  [[nodiscard]] StringView
+  trim_start_matches(std::function<bool(char)> predicate) const;
+  [[nodiscard]] StringView
+  trim_end_matches(std::function<bool(char)> predicate) const;
+  [[nodiscard]] StringView
+  trim_matches(std::function<bool(char)> predicate) const;
+  [[nodiscard]] StringView trim_prefix(StringView prefix) const;
+  [[nodiscard]] StringView trim_prefix(const char *prefix) const;
+  [[nodiscard]] StringView trim_suffix(StringView suffix) const;
+  [[nodiscard]] StringView trim_suffix(const char *suffix) const;
 
   [[nodiscard]] bool contains(const StringView &pat) const;
   [[nodiscard]] bool contains(const char *pat) const;
@@ -48,12 +64,14 @@ private:
 /* --------------- Implementation --------------- */
 
 /* --------------- Ctors + Operators --------------- */
-StringView::StringView(char *ptr, size_t len) : ptr_(ptr), len_(len) {}
+StringView::StringView(const char *ptr, size_t len)
+    : ptr_(const_cast<char *>(ptr)), len_(len) {}
 StringView::StringView(StringView &&other)
     : ptr_(other.ptr()), len_(other.len()) {}
 StringView::StringView(const StringView &other)
     : ptr_(other.ptr_), len_(other.len_) {}
-StringView::StringView(char *ptr) : ptr_(ptr), len_(strlen(ptr)) {}
+StringView::StringView(const char *ptr)
+    : ptr_(const_cast<char *>(ptr)), len_(strlen(ptr)) {}
 StringView &StringView::operator=(StringView &&other) {
   ptr_ = other.ptr();
   len_ = other.len();
@@ -83,22 +101,54 @@ size_t StringView::len() const { return len_; }
 
 /* --------------- Trim --------------- */
 StringView StringView::trim_start() const {
+  return trim_start_matches(
+      [](char c) { return isspace(static_cast<unsigned char>(c)); });
+}
+StringView StringView::trim_end() const {
+  return trim_end_matches(
+      [](char c) { return isspace(static_cast<unsigned char>(c)); });
+}
+StringView StringView::trim() const { return trim_start().trim_end(); }
+StringView
+StringView::trim_start_matches(std::function<bool(char)> predicate) const {
   StringView newSV(*this);
-  while (newSV.len() && isspace(static_cast<unsigned char>(*newSV.ptr()))) {
+  while (newSV.len() && predicate(*newSV.ptr())) {
     newSV.ptr_++;
     newSV.len_--;
   }
   return newSV;
 }
-StringView StringView::trim_end() const {
+StringView
+StringView::trim_end_matches(std::function<bool(char)> predicate) const {
   StringView newSV(*this);
-  while (newSV.len() &&
-         isspace(static_cast<unsigned char>(newSV.ptr()[newSV.len() - 1]))) {
+  while (newSV.len() && predicate(newSV.ptr()[newSV.len() - 1])) {
     newSV.len_--;
   }
   return newSV;
 }
-StringView StringView::trim() const { return trim_start().trim_end(); }
+StringView StringView::trim_matches(std::function<bool(char)> predicate) const {
+  return trim_start_matches(predicate).trim_end_matches(predicate);
+}
+StringView StringView::trim_prefix(StringView prefix) const {
+  StringView newSV(*this);
+  if (newSV.starts_with(prefix)) {
+    newSV.ptr_ += prefix.len();
+    newSV.len_ -= prefix.len();
+  }
+  return newSV;
+}
+StringView StringView::trim_prefix(const char *prefix) const {
+  return trim_prefix(StringView(const_cast<char *>(prefix)));
+}
+StringView StringView::trim_suffix(StringView suffix) const {
+  StringView newSV(*this);
+  if (newSV.ends_with(suffix))
+    newSV.len_ -= suffix.len();
+  return newSV;
+}
+StringView StringView::trim_suffix(const char *suffix) const {
+  return trim_suffix(StringView(const_cast<char *>(suffix)));
+}
 
 /* --------------- Pattern Matching --------------- */
 bool StringView::contains(const StringView &pat) const {
