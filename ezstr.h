@@ -32,7 +32,7 @@ public:
   [[nodiscard]] const char *get(size_t i) const;
   [[nodiscard]] const char &operator[](size_t i) const;
 
-  [[nodiscard]] char *ptr() const;
+  [[nodiscard]] const char *ptr() const;
   [[nodiscard]] size_t len() const;
   [[nodiscard]] bool is_empty() const;
   [[nodiscard]] bool is_valid() const;
@@ -74,7 +74,7 @@ public:
   [[nodiscard]] bool ends_with(StringView pat) const;
 
 private:
-  char *ptr_;
+  const char *ptr_;
   size_t len_;
 };
 
@@ -83,12 +83,10 @@ private:
 /* --------------- Implementation --------------- */
 
 /* --------------- Ctors + Operators --------------- */
-StringView::StringView(const char *ptr, size_t len)
-    : ptr_(const_cast<char *>(ptr)), len_(len) {}
+StringView::StringView(const char *ptr, size_t len) : ptr_(ptr), len_(len) {}
 StringView::StringView(const StringView &other)
     : ptr_(other.ptr_), len_(other.len_) {}
-StringView::StringView(const char *ptr)
-    : ptr_(const_cast<char *>(ptr)), len_(strlen(ptr)) {}
+StringView::StringView(const char *ptr) : ptr_(ptr), len_(strlen(ptr)) {}
 StringView &StringView::operator=(const StringView &other) {
   ptr_ = other.ptr_;
   len_ = other.len_;
@@ -110,7 +108,7 @@ const char *StringView::get(size_t i) const {
 StringView::operator bool() const { return !is_empty() && is_valid(); }
 
 /* --------------- Getters + KindaGetters --------------- */
-char *StringView::ptr() const { return ptr_; }
+const char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
 bool StringView::is_empty() const { return len() == 0; }
 bool StringView::is_valid() const { return ptr(); }
