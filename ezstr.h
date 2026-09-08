@@ -14,7 +14,6 @@ namespace ezstr {
 
 /* --------------- TODO --------------- */
 /* Split
- * Trim Matches
  */
 
 /* --------------- Definition --------------- */
@@ -26,6 +25,12 @@ public:
   StringView(const char *ptr);
   StringView &operator=(const StringView &other);
   [[nodiscard]] bool operator==(StringView other) const;
+
+  /**
+   * @warning returns NULL if the index is out of range
+   */
+  [[nodiscard]] const char *get(size_t i) const;
+  [[nodiscard]] const char &operator[](size_t i) const;
 
   [[nodiscard]] char *ptr() const;
   [[nodiscard]] size_t len() const;
@@ -95,8 +100,12 @@ bool StringView::operator==(StringView other) const {
   }
   return true;
 }
+const char &StringView::operator[](size_t i) const { return ptr()[i]; }
+const char *StringView::get(size_t i) const {
+  return i < len() ? &ptr()[i] : nullptr;
+}
 
-/* --------------- Getters --------------- */
+/* --------------- Getters + KindaGetters --------------- */
 char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
 
