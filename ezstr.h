@@ -1,10 +1,11 @@
 #include <cctype>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 
-#define DEV 1
-#if DEV
+#define EZSTR_DEV 1
+#if EZSTR_DEV
 #define EZSTR_IMPL
 #endif
 
@@ -48,6 +49,10 @@ public:
 
   [[nodiscard]] const char *ptr() const;
   [[nodiscard]] size_t len() const;
+  [[nodiscard]] const char *begin() const;
+  [[nodiscard]] const char *end() const;
+  [[nodiscard]] const char *rbegin() const;
+  [[nodiscard]] const char *rend() const;
   [[nodiscard]] bool is_empty() const;
   [[nodiscard]] bool is_valid() const;
   [[nodiscard]] explicit operator bool() const;
@@ -127,6 +132,10 @@ StringView StringView::operator()(size_t i, ToEnd) const {
 /* --------------- Getters + KindaGetters --------------- */
 const char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
+const char *StringView::begin() const { return ptr(); }
+const char *StringView::end() const { return ptr() + len(); }
+const char *StringView::rbegin() const { return end(); }
+const char *StringView::rend() const { return begin(); }
 bool StringView::is_empty() const { return len() == 0; }
 bool StringView::is_valid() const { return ptr(); }
 const char *StringView::get(size_t i) const {
