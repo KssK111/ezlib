@@ -3,10 +3,11 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <utility>
 
 #define EZSTR_DEV 1
 #if EZSTR_DEV
-#define EZSTR_IMPL
+#define EZSTR_IMPLEMENTATION
 #endif
 
 #ifndef EZSTR_H
@@ -15,36 +16,47 @@ namespace ezstr {
 
 /* --------------- TODO --------------- */
 /* Split
- * Find
- * Asserts
+ * Replace
  */
 
 /* --------------- Definition --------------- */
 
 struct ToEnd {};
+template <typename T> class Option {
+  bool is_some_;
+  union {
+    T value_;
+  };
+
+public:
+  Option() : is_some_(false) {}
+  Option(T &&value) : is_some_(true), value_(std::move(value)) {}
+  ~Option() {
+    if (is_some_)
+      value_.~T();
+  }
+  [[nodiscard]] explicit operator bool() const { return is_some_; }
+  [[nodiscard]] operator T() && { return std::move(value_); }
+  [[nodiscard]] operator T() const & { return value_; }
+};
 
 class StringView {
+  const char *ptr_;
+  size_t len_;
+
 public:
+  StringView();
   StringView(const char *ptr, size_t len);
   StringView(const StringView &other);
   StringView(const char *ptr);
   StringView &operator=(const StringView &other);
   [[nodiscard]] bool operator==(StringView other) const;
 
-  /**
-   * @warning returns NULL if the index is out of range
-   */
-  [[nodiscard]] const char *get(size_t i) const;
+  [[nodiscard]] Option<const char *> get(size_t i) const;
   [[nodiscard]] const char &operator[](size_t i) const;
-  /**
-   * @warning return value !is_valid() for incorrect parameters
-   */
-  [[nodiscard]] StringView get(size_t i, size_t j) const;
+  [[nodiscard]] Option<StringView> get(size_t i, size_t j) const;
   [[nodiscard]] StringView operator()(size_t i, size_t j) const;
-  /**
-   * @warning return value !is_valid() for incorrect *i* parameter
-   */
-  [[nodiscard]] StringView get(size_t i, ToEnd) const;
+  [[nodiscard]] Option<StringView> get(size_t i, ToEnd) const;
   [[nodiscard]] StringView operator()(size_t i, ToEnd) const;
 
   [[nodiscard]] const char *ptr() const;
@@ -88,20 +100,22 @@ public:
   [[nodiscard]] StringView trim_prefix(StringView prefix) const;
   [[nodiscard]] StringView trim_suffix(StringView suffix) const;
 
+  [[nodiscard]] Option<size_t> find(StringView pat) const;
+  [[nodiscard]] Option<size_t> find(std::function<bool(char)> predicate) const;
+  [[nodiscard]] Option<size_t> rfind(StringView pat) const;
+  [[nodiscard]] Option<size_t> rfind(std::function<bool(char)> predicate) const;
+
   [[nodiscard]] bool contains(StringView pat) const;
   [[nodiscard]] bool starts_with(StringView pat) const;
   [[nodiscard]] bool ends_with(StringView pat) const;
-
-private:
-  const char *ptr_;
-  size_t len_;
 };
 
-#ifdef EZSTR_IMPL
+#ifdef EZSTR_IMPLEMENTATION
 
 /* --------------- Implementation --------------- */
 
 /* --------------- Ctors + Operators --------------- */
+StringView::StringView() : ptr_(nullptr) {}
 StringView::StringView(const char *ptr, size_t len) : ptr_(ptr), len_(len) {}
 StringView::StringView(const StringView &other)
     : ptr_(other.ptr_), len_(other.len_) {}
@@ -114,10 +128,9 @@ StringView &StringView::operator=(const StringView &other) {
 bool StringView::operator==(StringView other) const {
   if (len() != other.len())
     return false;
-  for (size_t i = 0; i < len(); i++) {
+  for (size_t i = 0; i < len(); i++)
     if (ptr()[i] != other[i])
       return false;
-  }
   return true;
 }
 StringView::operator bool() const { return !is_empty() && is_valid(); }
@@ -138,14 +151,14 @@ const char *StringView::rbegin() const { return end(); }
 const char *StringView::rend() const { return begin(); }
 bool StringView::is_empty() const { return len() == 0; }
 bool StringView::is_valid() const { return ptr(); }
-const char *StringView::get(size_t i) const {
-  return i < len() ? &ptr()[i] : nullptr;
+Option<const char *> StringView::get(size_t i) const {
+  return i < len() ? Option(&ptr()[i]) : Option<const char *>();
 }
-StringView StringView::get(size_t i, size_t j) const {
-  return j <= len() && i <= j ? (*this)(i, j) : StringView(nullptr, 0);
+Option<StringView> StringView::get(size_t i, size_t j) const {
+  return j <= len() && i <= j ? Option((*this)(i, j)) : Option<StringView>();
 }
-StringView StringView::get(size_t i, ToEnd) const {
-  return i <= len() ? (*this)(i, ToEnd{}) : StringView(nullptr, 0);
+Option<StringView> StringView::get(size_t i, ToEnd) const {
+  return i <= len() ? Option((*this)(i, ToEnd{})) : Option<StringView>();
 }
 
 /* --------------- Trim --------------- */
@@ -178,9 +191,8 @@ StringView StringView::trim_start_matches(StringView chars) const {
 StringView
 StringView::trim_end_matches(std::function<bool(char)> predicate) const {
   StringView newSV(*this);
-  while (newSV.len() && predicate(newSV[newSV.len() - 1])) {
+  while (newSV.len() && predicate(newSV[newSV.len() - 1]))
     newSV.len_--;
-  }
   return newSV;
 }
 StringView StringView::trim_end_matches(StringView chars) const {
@@ -212,6 +224,45 @@ StringView StringView::trim_suffix(StringView suffix) const {
   return newSV;
 }
 
+/* --------------- Find --------------- */
+Option<size_t> StringView::find(StringView pat) const {
+  StringView copy = *this;
+  while (pat.len() <= copy.len()) {
+    if (copy.starts_with(pat))
+      return len() - copy.len();
+    copy.ptr_++;
+    copy.len_--;
+  }
+  return Option<size_t>();
+}
+Option<size_t> StringView::find(std::function<bool(char)> predicate) const {
+  size_t i = 0;
+  for (char c : (*this)) {
+    if (predicate(c))
+      return i;
+    i++;
+  }
+  return Option<size_t>();
+}
+Option<size_t> StringView::rfind(StringView pat) const {
+  StringView copy = *this;
+  while (pat.len() <= copy.len()) {
+    if (copy.ends_with(pat))
+      return copy.len() - pat.len();
+    copy.len_--;
+  }
+  return Option<size_t>();
+}
+Option<size_t> StringView::rfind(std::function<bool(char)> predicate) const {
+  size_t i = len() - 1;
+  for (auto c = rbegin(); c != rend(); c++) {
+    if (predicate(*c))
+      return i;
+    i--;
+  }
+  return Option<size_t>();
+}
+
 /* --------------- Pattern Matching --------------- */
 bool StringView::contains(StringView pat) const {
   if (pat.len() > len())
@@ -229,6 +280,6 @@ bool StringView::ends_with(StringView pat) const {
          pat == StringView(ptr() + len() - pat.len(), pat.len());
 }
 
-#endif // EZSTR_IMPL
+#endif // EZSTR_IMPLEMENTATION
 } // namespace ezstr
 #endif // !EZSTR_H
