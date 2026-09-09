@@ -14,9 +14,13 @@ namespace ezstr {
 
 /* --------------- TODO --------------- */
 /* Split
+ * Find
+ * Asserts
  */
 
 /* --------------- Definition --------------- */
+
+struct ToEnd {};
 
 class StringView {
 public:
@@ -31,6 +35,16 @@ public:
    */
   [[nodiscard]] const char *get(size_t i) const;
   [[nodiscard]] const char &operator[](size_t i) const;
+  /**
+   * @warning return value !is_valid() for incorrect parameters
+   */
+  [[nodiscard]] StringView get(size_t i, size_t j) const;
+  [[nodiscard]] StringView operator()(size_t i, size_t j) const;
+  /**
+   * @warning return value !is_valid() for incorrect *i* parameter
+   */
+  [[nodiscard]] StringView get(size_t i, ToEnd) const;
+  [[nodiscard]] StringView operator()(size_t i, ToEnd) const;
 
   [[nodiscard]] const char *ptr() const;
   [[nodiscard]] size_t len() const;
@@ -101,17 +115,29 @@ bool StringView::operator==(StringView other) const {
   }
   return true;
 }
-const char &StringView::operator[](size_t i) const { return ptr()[i]; }
-const char *StringView::get(size_t i) const {
-  return i < len() ? &ptr()[i] : nullptr;
-}
 StringView::operator bool() const { return !is_empty() && is_valid(); }
+const char &StringView::operator[](size_t i) const { return ptr()[i]; }
+StringView StringView::operator()(size_t i, size_t j) const {
+  return StringView(ptr() + i, j - i);
+}
+StringView StringView::operator()(size_t i, ToEnd) const {
+  return (*this)(i, len());
+}
 
 /* --------------- Getters + KindaGetters --------------- */
 const char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
 bool StringView::is_empty() const { return len() == 0; }
 bool StringView::is_valid() const { return ptr(); }
+const char *StringView::get(size_t i) const {
+  return i < len() ? &ptr()[i] : nullptr;
+}
+StringView StringView::get(size_t i, size_t j) const {
+  return j <= len() && i <= j ? (*this)(i, j) : StringView(nullptr, 0);
+}
+StringView StringView::get(size_t i, ToEnd) const {
+  return i <= len() ? (*this)(i, ToEnd{}) : StringView(nullptr, 0);
+}
 
 /* --------------- Trim --------------- */
 StringView StringView::trim_start() const {
