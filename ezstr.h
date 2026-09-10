@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdio>
@@ -15,13 +16,16 @@
 namespace ezstr {
 
 /* --------------- TODO --------------- */
-/* Split
+/*
  * Replace
  */
 
 /* --------------- Definition + Templates --------------- */
 
-struct ToEnd {};
+class StringView;
+class SplitWhitespace;
+namespace {
+template <typename T> class Option;
 template <typename T> class Option {
   bool is_some_;
   union {
@@ -37,9 +41,21 @@ public:
   }
   [[nodiscard]] explicit operator bool() const { return is_some_; }
   [[nodiscard]] operator T() && { return std::move(value_); }
-  // [[nodiscard]] operator T() const & { return value_; }
+  [[nodiscard]] T unwrap_or(T &&substitute) && {
+    if (is_some_)
+      return std::move(value_);
+    else
+      return substitute;
+  }
+  [[nodiscard]] T unwrap_or_else(std::function<T()> fn) && {
+    if (is_some_)
+      return std::move(value_);
+    else
+      return fn();
+  }
   [[nodiscard]] T clone() const & { return value_; }
 };
+} // namespace
 
 class StringView {
   const char *ptr_;
@@ -57,8 +73,6 @@ public:
   [[nodiscard]] const char &operator[](size_t i) const;
   [[nodiscard]] Option<StringView> get(size_t i, size_t j) const;
   [[nodiscard]] StringView operator()(size_t i, size_t j) const;
-  [[nodiscard]] Option<StringView> get(size_t i, ToEnd) const;
-  [[nodiscard]] StringView operator()(size_t i, ToEnd) const;
 
   [[nodiscard]] const char *ptr() const;
   [[nodiscard]] size_t len() const;
@@ -109,6 +123,27 @@ public:
   [[nodiscard]] bool contains(StringView pat) const;
   [[nodiscard]] bool starts_with(StringView pat) const;
   [[nodiscard]] bool ends_with(StringView pat) const;
+
+  [[nodiscard]] SplitWhitespace split_whitespace() const;
+};
+
+class SplitWhitespace {
+  StringView sv_;
+  class Iterator {
+    StringView sv_;
+
+  public:
+    explicit Iterator(StringView sv);
+    bool operator!=(const Iterator &other) const;
+    bool operator==(const Iterator &other) const;
+    Iterator &operator++();
+    StringView operator*() const;
+  };
+
+public:
+  explicit SplitWhitespace(StringView sv);
+  Iterator begin() const;
+  Iterator end() const;
 };
 
 #ifdef EZSTR_IMPLEMENTATION
@@ -139,8 +174,26 @@ const char &StringView::operator[](size_t i) const { return ptr()[i]; }
 StringView StringView::operator()(size_t i, size_t j) const {
   return StringView(ptr() + i, j - i);
 }
-StringView StringView::operator()(size_t i, ToEnd) const {
-  return (*this)(i, len());
+SplitWhitespace::SplitWhitespace(StringView sv) : sv_(sv) {}
+SplitWhitespace::Iterator::Iterator(StringView sv) : sv_(sv) {}
+bool SplitWhitespace::Iterator::operator!=(const Iterator &other) const {
+  return sv_.ptr() != other.sv_.ptr();
+}
+bool SplitWhitespace::Iterator::operator==(const Iterator &other) const {
+  return sv_.ptr() == other.sv_.ptr();
+}
+SplitWhitespace::Iterator &SplitWhitespace::Iterator::operator++() {
+  sv_ = sv_.trim_start_matches(
+               [](char c) { return !isspace(static_cast<unsigned char>(c)); })
+            .trim_start();
+  return *this;
+}
+StringView SplitWhitespace::Iterator::operator*() const {
+  StringView copy = sv_.trim_start();
+  return copy(0, copy.find([](char c) {
+                       return isspace(static_cast<unsigned char>(c));
+                     })
+                     .unwrap_or(copy.len()));
 }
 
 /* --------------- Getters + KindaGetters --------------- */
@@ -158,8 +211,12 @@ Option<const char *> StringView::get(size_t i) const {
 Option<StringView> StringView::get(size_t i, size_t j) const {
   return j <= len() && i <= j ? Option((*this)(i, j)) : Option<StringView>();
 }
-Option<StringView> StringView::get(size_t i, ToEnd) const {
-  return i <= len() ? Option((*this)(i, ToEnd{})) : Option<StringView>();
+SplitWhitespace::Iterator SplitWhitespace::begin() const {
+  return SplitWhitespace::Iterator(sv_.trim_start());
+}
+SplitWhitespace::Iterator SplitWhitespace::end() const {
+  return SplitWhitespace::Iterator(
+      StringView(sv_.ptr() + sv_.trim_end().len(), 0));
 }
 
 /* --------------- Trim --------------- */
@@ -279,6 +336,11 @@ bool StringView::starts_with(StringView pat) const {
 bool StringView::ends_with(StringView pat) const {
   return pat.len() <= len() &&
          pat == StringView(ptr() + len() - pat.len(), pat.len());
+}
+
+/* --------------- Split --------------- */
+SplitWhitespace StringView::split_whitespace() const {
+  return SplitWhitespace(*this);
 }
 
 #endif // EZSTR_IMPLEMENTATION
