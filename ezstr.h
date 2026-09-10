@@ -19,7 +19,7 @@ namespace ezstr {
  * Replace
  */
 
-/* --------------- Definition --------------- */
+/* --------------- Definition + Templates --------------- */
 
 struct ToEnd {};
 template <typename T> class Option {
@@ -174,12 +174,12 @@ StringView StringView::trim_end() const {
 StringView StringView::trim() const { return trim_start().trim_end(); }
 StringView
 StringView::trim_start_matches(std::function<bool(char)> predicate) const {
-  StringView newSV(*this);
-  while (newSV.len() && predicate(newSV[0])) {
-    newSV.ptr_++;
-    newSV.len_--;
+  StringView copy(*this);
+  while (copy.len() && predicate(copy[0])) {
+    copy.ptr_++;
+    copy.len_--;
   }
-  return newSV;
+  return copy;
 }
 StringView StringView::trim_start_matches(StringView chars) const {
   return trim_start_matches([chars](char c) {
@@ -191,10 +191,10 @@ StringView StringView::trim_start_matches(StringView chars) const {
 }
 StringView
 StringView::trim_end_matches(std::function<bool(char)> predicate) const {
-  StringView newSV(*this);
-  while (newSV.len() && predicate(newSV[newSV.len() - 1]))
-    newSV.len_--;
-  return newSV;
+  StringView copy(*this);
+  while (copy.len() && predicate(copy[copy.len() - 1]))
+    copy.len_--;
+  return copy;
 }
 StringView StringView::trim_end_matches(StringView chars) const {
   return trim_end_matches([chars](char c) {
@@ -211,18 +211,18 @@ StringView StringView::trim_matches(StringView chars) const {
   return trim_start_matches(chars).trim_end_matches(chars);
 }
 StringView StringView::trim_prefix(StringView prefix) const {
-  StringView newSV(*this);
-  if (newSV.starts_with(prefix)) {
-    newSV.ptr_ += prefix.len();
-    newSV.len_ -= prefix.len();
+  StringView copy(*this);
+  if (copy.starts_with(prefix)) {
+    copy.ptr_ += prefix.len();
+    copy.len_ -= prefix.len();
   }
-  return newSV;
+  return copy;
 }
 StringView StringView::trim_suffix(StringView suffix) const {
-  StringView newSV(*this);
-  if (newSV.ends_with(suffix))
-    newSV.len_ -= suffix.len();
-  return newSV;
+  StringView copy(*this);
+  if (copy.ends_with(suffix))
+    copy.len_ -= suffix.len();
+  return copy;
 }
 
 /* --------------- Find --------------- */
