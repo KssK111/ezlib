@@ -37,7 +37,8 @@ public:
   }
   [[nodiscard]] explicit operator bool() const { return is_some_; }
   [[nodiscard]] operator T() && { return std::move(value_); }
-  [[nodiscard]] operator T() const & { return value_; }
+  // [[nodiscard]] operator T() const & { return value_; }
+  [[nodiscard]] T clone() const & { return value_; }
 };
 
 class StringView {
@@ -182,8 +183,8 @@ StringView::trim_start_matches(std::function<bool(char)> predicate) const {
 }
 StringView StringView::trim_start_matches(StringView chars) const {
   return trim_start_matches([chars](char c) {
-    for (size_t i = 0; i < chars.len(); i++)
-      if (c == chars[i])
+    for (char ch : chars)
+      if (c == ch)
         return true;
     return false;
   });
@@ -197,8 +198,8 @@ StringView::trim_end_matches(std::function<bool(char)> predicate) const {
 }
 StringView StringView::trim_end_matches(StringView chars) const {
   return trim_end_matches([chars](char c) {
-    for (size_t i = 0; i < chars.len(); i++)
-      if (c == chars[i])
+    for (char ch : chars)
+      if (c == ch)
         return true;
     return false;
   });
