@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <utility>
@@ -15,13 +17,16 @@
 #define EZSTR_H
 namespace ezstr {
 
-/* --------------- TODO --------------- */
-/*
+/* --------------- TODO ---------------
  * Replace
+ * trim_end_mut
+ * trim_end_matches_mut
+ * trim_suffix_mut
  */
 
 /* --------------- Definition + Templates --------------- */
 
+class String;
 class StringView;
 class SplitWhitespace;
 namespace {
@@ -67,13 +72,16 @@ public:
   StringView(const StringView &other);
   StringView(const char *ptr);
   StringView &operator=(const StringView &other);
-  [[nodiscard]] bool operator==(StringView other) const;
+  [[nodiscard]] bool operator==(const String &other) const;
+  [[nodiscard]] bool operator==(const StringView other) const;
 
   [[nodiscard]] Option<const char *> get(size_t i) const;
   [[nodiscard]] const char &operator[](size_t i) const;
   [[nodiscard]] Option<StringView> get(size_t i, size_t j) const;
   [[nodiscard]] StringView operator()(size_t i, size_t j) const;
 
+  void unsafe_set_ptr(const char *ptr);
+  void unsafe_set_len(size_t len);
   [[nodiscard]] const char *ptr() const;
   [[nodiscard]] size_t len() const;
   [[nodiscard]] const char *begin() const;
@@ -125,6 +133,7 @@ public:
   [[nodiscard]] bool ends_with(StringView pat) const;
 
   [[nodiscard]] SplitWhitespace split_whitespace() const;
+  [[nodiscard]] String to_string() const;
 };
 
 class SplitWhitespace {
@@ -146,6 +155,29 @@ public:
   Iterator end() const;
 };
 
+class String {
+  static constexpr size_t INIT_CAP = 23;
+  StringView sv_;
+  size_t cap_;
+
+public:
+  String();
+  String(StringView sv);
+  String(String &&str);
+  ~String();
+  const StringView *operator->() const;
+  const StringView &operator*() const;
+  String &operator=(const StringView &other);
+  String &operator=(String &&other);
+  String &operator+=(const StringView &other);
+  String &operator+=(const String &other);
+  [[nodiscard]] bool operator==(const StringView &other) const;
+  [[nodiscard]] bool operator==(const String &other) const;
+  [[nodiscard]] StringView as_str() const;
+  [[nodiscard]] size_t cap() const;
+  [[nodiscard]] char *ptr_mut() const;
+};
+
 #ifdef EZSTR_IMPLEMENTATION
 
 /* --------------- Implementation --------------- */
@@ -162,12 +194,7 @@ StringView &StringView::operator=(const StringView &other) {
   return *this;
 }
 bool StringView::operator==(StringView other) const {
-  if (len() != other.len())
-    return false;
-  for (size_t i = 0; i < len(); i++)
-    if (ptr()[i] != other[i])
-      return false;
-  return true;
+  return len() == other.len() && memcmp(ptr(), other.ptr(), len()) == 0;
 }
 StringView::operator bool() const { return !is_empty() && is_valid(); }
 const char &StringView::operator[](size_t i) const { return ptr()[i]; }
@@ -195,8 +222,86 @@ StringView SplitWhitespace::Iterator::operator*() const {
                      })
                      .unwrap_or(copy.len()));
 }
+/**
+ * @warning
+ * Use after free for self assignment
+ * e.g. s += s or s += s.as_str();
+ */
+String &String::operator+=(const StringView &other) {
+  assert(ptr_mut() != other.ptr());
+  size_t old_len = as_str().len();
+  size_t len = old_len + other.len();
+  if (len > cap()) {
+    cap_ = 2 * (len);
+    char *ptr = (char *)malloc(cap() + 1);
+    memcpy(ptr, as_str().ptr(), old_len);
+    free(ptr_mut());
+    sv_ = {ptr, len};
+  }
+  // other.ptr() might be freed if this == other
+  memcpy(ptr_mut() + old_len, other.ptr(), other.len());
+  ptr_mut()[len] = '\0';
+  return *this;
+}
+/**
+ * @warning
+ * Use after free for self assignment
+ * e.g. s += s or s += s.as_str();
+ */
+String &String::operator+=(const String &other) {
+  return (*this) += other.as_str();
+}
+String::String(String &&str) : sv_(str.sv_), cap_(str.cap_) { str.sv_ = {}; }
+String &String::operator=(const StringView &other) {
+  if (other.len() > cap()) {
+    free(ptr_mut());
+    cap_ = other.len();
+    sv_ = {(char *)malloc(cap() + 1), cap()};
+  }
+  memcpy(ptr_mut(), other.ptr(), other.len());
+  ptr_mut()[other.len()] = '\0';
+  return *this;
+}
+/**
+ * @warning
+ * Pointer of the returned string is freed for self assignment
+ * e.g. s = std::move(s);
+ */
+String &String::operator=(String &&other) {
+  assert(ptr_mut() != other->ptr());
+  free(ptr_mut());
+  sv_ = other.sv_;
+  cap_ = other.cap();
+  other.sv_ = {};
+  return *this;
+}
+String::String() : cap_(INIT_CAP) {
+  char *ptr = (char *)malloc(INIT_CAP + 1);
+  ptr[0] = '\0';
+  sv_ = {ptr, 0};
+}
+String::String(StringView sv)
+    : cap_(INIT_CAP > sv.len() ? INIT_CAP : sv.len()) {
+  char *ptr = (char *)malloc(cap() + 1);
+  memcpy(ptr, sv.ptr(), sv.len());
+  ptr[sv.len()] = '\0';
+  sv_ = {ptr, sv.len()};
+}
+String::~String() { free((void *)sv_.ptr()); }
+const StringView *String::operator->() const { return &sv_; }
+const StringView &String::operator*() const { return sv_; }
+bool StringView::operator==(const String &other) const {
+  return *this == other.as_str();
+}
+bool String::operator==(const StringView &other) const {
+  return as_str() == other;
+}
+bool String::operator==(const String &other) const {
+  return as_str() == other.as_str();
+}
+String StringView::to_string() const { return String(*this); }
 
-/* --------------- Getters + KindaGetters --------------- */
+/* --------------- Getters + KindaGetters + Setters --------------- */
 const char *StringView::ptr() const { return ptr_; }
 size_t StringView::len() const { return len_; }
 const char *StringView::begin() const { return ptr(); }
@@ -218,6 +323,12 @@ SplitWhitespace::Iterator SplitWhitespace::end() const {
   return SplitWhitespace::Iterator(
       StringView(sv_.ptr() + sv_.trim_end().len(), 0));
 }
+constexpr size_t String::INIT_CAP;
+char *String::ptr_mut() const { return const_cast<char *>((*this)->ptr()); }
+StringView String::as_str() const { return sv_; }
+size_t String::cap() const { return cap_; }
+void StringView::unsafe_set_ptr(const char *ptr) { ptr_ = ptr; }
+void StringView::unsafe_set_len(size_t len) { len_ = len; }
 
 /* --------------- Trim --------------- */
 StringView StringView::trim_start() const {
@@ -330,9 +441,12 @@ bool StringView::contains(StringView pat) const {
       return true;
   return false;
 }
+
+// Cleaner implementation possible using slices
 bool StringView::starts_with(StringView pat) const {
   return pat.len() <= len() && pat == StringView(ptr(), pat.len());
 }
+// Cleaner implementation possible using slices
 bool StringView::ends_with(StringView pat) const {
   return pat.len() <= len() &&
          pat == StringView(ptr() + len() - pat.len(), pat.len());
