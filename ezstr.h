@@ -19,9 +19,6 @@ namespace ezstr {
 
 /* --------------- TODO ---------------
  * Replace
- * trim_end_mut
- * trim_end_matches_mut
- * trim_suffix_mut
  */
 
 /* --------------- Definition + Templates --------------- */
@@ -71,6 +68,7 @@ public:
   StringView(const char *ptr, size_t len);
   StringView(const StringView &other);
   StringView(const char *ptr);
+  StringView(char &c);
   StringView &operator=(const StringView &other);
   [[nodiscard]] bool operator==(const String &other) const;
   [[nodiscard]] bool operator==(const StringView other) const;
@@ -82,6 +80,7 @@ public:
 
   void unsafe_set_ptr(const char *ptr);
   void unsafe_set_len(size_t len);
+  [[nodiscard]] char *unsafe_ptr_mut() const;
   [[nodiscard]] const char *ptr() const;
   [[nodiscard]] size_t len() const;
   [[nodiscard]] const char *begin() const;
@@ -164,6 +163,7 @@ public:
   String();
   String(StringView sv);
   String(String &&str);
+  String(const char *ptr, size_t len, size_t cap);
   ~String();
   const StringView *operator->() const;
   const StringView &operator*() const;
@@ -173,9 +173,23 @@ public:
   String &operator+=(const String &other);
   [[nodiscard]] bool operator==(const StringView &other) const;
   [[nodiscard]] bool operator==(const String &other) const;
+  [[nodiscard]] String clone() const;
   [[nodiscard]] StringView as_str() const;
   [[nodiscard]] size_t cap() const;
   [[nodiscard]] char *ptr_mut() const;
+  [[nodiscard]] char *move_ptr();
+  void unsafe_set_cap(size_t cap);
+  void unsafe_set_ptr(const char *ptr);
+  void unsafe_set_len(size_t len);
+  void unsafe_set_sv(StringView sv);
+  /**
+   * @warning Checks individual characters, for removing suffixes use
+   * trim_suffix_mut
+   */
+  void trim_end_matches_mut(StringView chars);
+  void trim_end_mut();
+  void trim_end_matches_mut(std::function<bool(char)> predicate);
+  void trim_suffix_mut(StringView suffix);
 };
 
 #ifdef EZSTR_IMPLEMENTATION
@@ -188,6 +202,7 @@ StringView::StringView(const char *ptr, size_t len) : ptr_(ptr), len_(len) {}
 StringView::StringView(const StringView &other)
     : ptr_(other.ptr_), len_(other.len_) {}
 StringView::StringView(const char *ptr) : ptr_(ptr), len_(strlen(ptr)) {}
+StringView::StringView(char &c) : ptr_(&c), len_(1) {}
 StringView &StringView::operator=(const StringView &other) {
   ptr_ = other.ptr_;
   len_ = other.len_;
@@ -262,6 +277,8 @@ String &String::operator=(const StringView &other) {
   ptr_mut()[other.len()] = '\0';
   return *this;
 }
+String::String(const char *ptr, size_t len, size_t cap)
+    : sv_(ptr, len), cap_(cap) {}
 /**
  * @warning
  * Pointer of the returned string is freed for self assignment
@@ -325,10 +342,21 @@ SplitWhitespace::Iterator SplitWhitespace::end() const {
 }
 constexpr size_t String::INIT_CAP;
 char *String::ptr_mut() const { return const_cast<char *>((*this)->ptr()); }
+char *String::move_ptr() {
+  char *ptr = ptr_mut();
+  this->sv_.unsafe_set_ptr(nullptr);
+  return ptr;
+}
+String String::clone() const { return String(as_str()); }
 StringView String::as_str() const { return sv_; }
 size_t String::cap() const { return cap_; }
 void StringView::unsafe_set_ptr(const char *ptr) { ptr_ = ptr; }
 void StringView::unsafe_set_len(size_t len) { len_ = len; }
+char *StringView::unsafe_ptr_mut() const { return const_cast<char *>(ptr()); }
+void String::unsafe_set_cap(size_t cap) { cap_ = cap; }
+void String::unsafe_set_ptr(const char *ptr) { sv_.unsafe_set_ptr(ptr); }
+void String::unsafe_set_len(size_t len) { sv_.unsafe_set_len(len); }
+void String::unsafe_set_sv(StringView sv) { sv_ = sv; }
 
 /* --------------- Trim --------------- */
 StringView StringView::trim_start() const {
@@ -392,6 +420,16 @@ StringView StringView::trim_suffix(StringView suffix) const {
     copy.len_ -= suffix.len();
   return copy;
 }
+void String::trim_end_mut() { unsafe_set_len((*this)->trim_end().len()); }
+void String::trim_end_matches_mut(std::function<bool(char)> predicate) {
+  unsafe_set_len((*this)->trim_end_matches(predicate).len());
+}
+void String::trim_end_matches_mut(StringView chars) {
+  unsafe_set_len((*this)->trim_end_matches(chars).len());
+}
+void String::trim_suffix_mut(StringView suffix) {
+  unsafe_set_len((*this)->trim_suffix(suffix).len());
+}
 
 /* --------------- Find --------------- */
 Option<size_t> StringView::find(StringView pat) const {
@@ -442,14 +480,11 @@ bool StringView::contains(StringView pat) const {
   return false;
 }
 
-// Cleaner implementation possible using slices
 bool StringView::starts_with(StringView pat) const {
-  return pat.len() <= len() && pat == StringView(ptr(), pat.len());
+  return pat.len() <= len() && pat == (*this)(0, pat.len());
 }
-// Cleaner implementation possible using slices
 bool StringView::ends_with(StringView pat) const {
-  return pat.len() <= len() &&
-         pat == StringView(ptr() + len() - pat.len(), pat.len());
+  return pat.len() <= len() && pat == (*this)(len() - pat.len(), len());
 }
 
 /* --------------- Split --------------- */
