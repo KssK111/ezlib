@@ -8,6 +8,12 @@
 #include <functional>
 #include <utility>
 
+#ifdef _GNU_SOURCE
+#ifndef EZSTR_HAS_MEMMEM
+#define EZSTR_HAS_MEMMEM
+#endif // !EZSTR_HAS_MEMMEM
+#endif // _GNU_SOURCE
+
 #define EZSTR_DEV 1
 #if EZSTR_DEV
 #define EZSTR_IMPLEMENTATION
@@ -18,7 +24,10 @@
 namespace ezstr {
 
 /* --------------- TODO ---------------
- * Replace
+ * StringView::replace(old, new)
+ * ?StringView::replace(predicate, char)
+ * ?String::unsafe_replace_mut(old, new)
+ * ⬆️ use StringView::find
  */
 
 /* --------------- Definition + Templates --------------- */
@@ -161,16 +170,20 @@ class String {
 
 public:
   String();
+  String(size_t cap);
   String(StringView sv);
   String(String &&str);
   String(const char *ptr, size_t len, size_t cap);
   ~String();
+
   const StringView *operator->() const;
   const StringView &operator*() const;
   String &operator=(const StringView &other);
   String &operator=(String &&other);
   String &operator+=(const StringView &other);
   String &operator+=(const String &other);
+  [[nodiscard]] char &operator[](size_t i) const;
+  [[nodiscard]] StringView operator()(size_t i, size_t j) const;
   [[nodiscard]] bool operator==(const StringView &other) const;
   [[nodiscard]] bool operator==(const String &other) const;
   [[nodiscard]] String clone() const;
@@ -292,8 +305,9 @@ String &String::operator=(String &&other) {
   other.sv_ = {};
   return *this;
 }
-String::String() : cap_(INIT_CAP) {
-  char *ptr = (char *)malloc(INIT_CAP + 1);
+String::String() : String(INIT_CAP) {}
+String::String(size_t cap) : cap_(std::max(cap, INIT_CAP)) {
+  char *ptr = (char *)malloc(cap_ + 1);
   ptr[0] = '\0';
   sv_ = {ptr, 0};
 }
@@ -310,6 +324,8 @@ const StringView &String::operator*() const { return sv_; }
 bool StringView::operator==(const String &other) const {
   return *this == other.as_str();
 }
+char &String::operator[](size_t i) const { return const_cast<char &>(sv_[i]); }
+StringView String::operator()(size_t i, size_t j) const { return sv_(i, j); }
 bool String::operator==(const StringView &other) const {
   return as_str() == other;
 }
@@ -433,6 +449,11 @@ void String::trim_suffix_mut(StringView suffix) {
 
 /* --------------- Find --------------- */
 Option<size_t> StringView::find(StringView pat) const {
+#ifdef EZSTR_HAS_MEMMEM
+  char *pat_addr = (char *)memmem(ptr(), len(), pat.ptr(), pat.len());
+  return pat_addr ? Option(static_cast<size_t>(pat_addr - ptr()))
+                  : Option<size_t>();
+#else
   StringView copy = *this;
   while (pat.len() <= copy.len()) {
     if (copy.starts_with(pat))
@@ -441,6 +462,7 @@ Option<size_t> StringView::find(StringView pat) const {
     copy.len_--;
   }
   return Option<size_t>();
+#endif
 }
 Option<size_t> StringView::find(std::function<bool(char)> predicate) const {
   size_t i = 0;
@@ -474,10 +496,14 @@ Option<size_t> StringView::rfind(std::function<bool(char)> predicate) const {
 bool StringView::contains(StringView pat) const {
   if (pat.len() > len())
     return false;
+#ifdef EZSTR_HAS_MEMMEM
+  return memmem(ptr(), len(), pat.ptr(), pat.len()) != nullptr;
+#else
   for (size_t i = 0; i <= len() - pat.len(); i++)
     if (pat == StringView(ptr() + i, pat.len()))
       return true;
   return false;
+#endif // EZSTR_HAS_MEMMEM
 }
 
 bool StringView::starts_with(StringView pat) const {
