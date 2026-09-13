@@ -1,3 +1,6 @@
+#ifndef EZSTR_H
+#define EZSTR_H
+
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -19,16 +22,13 @@
 #define EZSTR_IMPLEMENTATION
 #endif
 
-#ifndef EZSTR_H
-#define EZSTR_H
-namespace ezstr {
-
 /* --------------- TODO ---------------
  * ?StringView::replace(predicate, char)
  * ?String::unsafe_replace_mut(old, new)
  */
 
 /* --------------- Definition + Templates --------------- */
+namespace ezstr {
 
 class String;
 class StringView;
@@ -210,7 +210,10 @@ public:
   void trim_suffix_mut(StringView suffix);
 };
 
+} // namespace ezstr
+#endif // !EZSTR_H
 #ifdef EZSTR_IMPLEMENTATION
+namespace ezstr {
 
 /* --------------- Implementation --------------- */
 
@@ -545,6 +548,5 @@ String StringView::replace(StringView from, StringView to) const {
   return ret;
 }
 
-#endif // EZSTR_IMPLEMENTATION
 } // namespace ezstr
-#endif // !EZSTR_H
+#endif // EZSTR_IMPLEMENTATION
