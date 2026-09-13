@@ -269,8 +269,9 @@ String &String::operator+=(const StringView &other) {
     char *ptr = (char *)malloc(cap() + 1);
     memcpy(ptr, as_str().ptr(), old_len);
     free(ptr_mut());
-    sv_ = {ptr, len};
+    unsafe_set_ptr(ptr);
   }
+  unsafe_set_len(len);
   // other.ptr() might be freed if this == other
   memcpy(ptr_mut() + old_len, other.ptr(), other.len());
   ptr_mut()[len] = '\0';
