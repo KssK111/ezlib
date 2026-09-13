@@ -14,7 +14,7 @@
 #endif // !EZSTR_HAS_MEMMEM
 #endif // _GNU_SOURCE
 
-#define EZSTR_DEV 1
+#define EZSTR_DEV 0
 #if EZSTR_DEV
 #define EZSTR_IMPLEMENTATION
 #endif
@@ -24,10 +24,8 @@
 namespace ezstr {
 
 /* --------------- TODO ---------------
- * StringView::replace(old, new)
  * ?StringView::replace(predicate, char)
  * ?String::unsafe_replace_mut(old, new)
- * ⬆️ use StringView::find
  */
 
 /* --------------- Definition + Templates --------------- */
@@ -78,6 +76,7 @@ public:
   StringView(const StringView &other);
   StringView(const char *ptr);
   StringView(char &c);
+  [[nodiscard]] String to_string() const;
   StringView &operator=(const StringView &other);
   [[nodiscard]] bool operator==(const String &other) const;
   [[nodiscard]] bool operator==(const StringView other) const;
@@ -105,24 +104,25 @@ public:
   [[nodiscard]] StringView trim() const;
 
   /**
-   * @warning Checks individual characters, for removing prefixes use
-   * trim_prefix
+   * @warning
+   * Checks individual characters, for removing prefixes use trim_prefix
    */
   [[nodiscard]] StringView trim_start_matches(StringView chars) const;
   [[nodiscard]] StringView
   trim_start_matches(std::function<bool(char)> predicate) const;
 
   /**
-   * @warning Checks individual characters, for removing suffixes use
-   * trim_suffix
+   * @warning
+   * Checks individual characters, for removing suffixes use trim_suffix
    */
   [[nodiscard]] StringView trim_end_matches(StringView chars) const;
   [[nodiscard]] StringView
   trim_end_matches(std::function<bool(char)> predicate) const;
 
   /**
-   * @warning Checks individual characters, for removing prefixes and suffixes
-   * use trim_prefix and trim_suffix
+   * @warning
+   * Checks individual characters, for removing prefixes and suffixes use
+   * trim_prefix and trim_suffix
    */
   [[nodiscard]] StringView trim_matches(StringView chars) const;
   [[nodiscard]] StringView
@@ -141,7 +141,12 @@ public:
   [[nodiscard]] bool ends_with(StringView pat) const;
 
   [[nodiscard]] SplitWhitespace split_whitespace() const;
-  [[nodiscard]] String to_string() const;
+
+  /**
+   * @warning
+   * Loops infinitely if from == ""
+   */
+  [[nodiscard]] String replace(StringView from, StringView to) const;
 };
 
 class SplitWhitespace {
@@ -196,8 +201,8 @@ public:
   void unsafe_set_len(size_t len);
   void unsafe_set_sv(StringView sv);
   /**
-   * @warning Checks individual characters, for removing suffixes use
-   * trim_suffix_mut
+   * @warning
+   * Checks individual characters, for removing suffixes use trim_suffix_mut
    */
   void trim_end_matches_mut(StringView chars);
   void trim_end_mut();
@@ -516,6 +521,27 @@ bool StringView::ends_with(StringView pat) const {
 /* --------------- Split --------------- */
 SplitWhitespace StringView::split_whitespace() const {
   return SplitWhitespace(*this);
+}
+
+/* --------------- Replace --------------- */
+String StringView::replace(StringView from, StringView to) const {
+  assert(!(from == ""));
+  size_t to_div_from_ceil_nonzero =
+      to.len() ? to.len() / from.len() + (to.len() % from.len() != 0) : 1;
+  size_t cap = len() * to_div_from_ceil_nonzero;
+
+  String ret(cap);
+  StringView copy = *this;
+  while (copy.ptr() != ptr() + len()) {
+    size_t from_idx = copy.find(from).unwrap_or(copy.len());
+    ret += copy(0, from_idx);
+    copy = copy(from_idx, copy.len());
+    if (copy.ptr() == ptr() + len())
+      break;
+    ret += to;
+    copy = copy(from.len(), copy.len());
+  }
+  return ret;
 }
 
 #endif // EZSTR_IMPLEMENTATION
