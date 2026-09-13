@@ -11,6 +11,9 @@
 #include <functional>
 #include <utility>
 
+// Define if you are sure, your system has certain functionality
+// #define EZSTR_HAS_MEMMEM
+
 #ifdef _GNU_SOURCE
 #ifndef EZSTR_HAS_MEMMEM
 #define EZSTR_HAS_MEMMEM
@@ -27,7 +30,7 @@
  * ?String::unsafe_replace_mut(old, new)
  */
 
-/* --------------- Definition + Templates --------------- */
+/* --------------- Declaration + Templates --------------- */
 namespace ezstr {
 
 class String;
