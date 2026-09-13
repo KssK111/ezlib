@@ -51,16 +51,10 @@ public:
   [[nodiscard]] explicit operator bool() const { return is_some_; }
   [[nodiscard]] operator T() && { return std::move(value_); }
   [[nodiscard]] T unwrap_or(T &&substitute) && {
-    if (is_some_)
-      return std::move(value_);
-    else
-      return substitute;
+    return is_some_ ? std::move(value_) : std::move(substitute);
   }
   [[nodiscard]] T unwrap_or_else(std::function<T()> fn) && {
-    if (is_some_)
-      return std::move(value_);
-    else
-      return fn();
+    return is_some_ ? std::move(value_) : fn();
   }
   [[nodiscard]] T clone() const & { return value_; }
 };
