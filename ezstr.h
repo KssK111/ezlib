@@ -20,7 +20,7 @@
 #endif // !EZSTR_HAS_MEMMEM
 #endif // _GNU_SOURCE
 
-#define EZSTR_DEV 0
+#define EZSTR_DEV 1
 #if EZSTR_DEV
 #define EZSTR_IMPLEMENTATION
 #endif
@@ -317,8 +317,7 @@ String::String(size_t cap) : cap_(std::max(cap, INIT_CAP)) {
   ptr[0] = '\0';
   sv_ = {ptr, 0};
 }
-String::String(StringView sv)
-    : cap_(INIT_CAP > sv.len() ? INIT_CAP : sv.len()) {
+String::String(StringView sv) : cap_(std::max(sv.len(), INIT_CAP)) {
   char *ptr = (char *)malloc(cap() + 1);
   memcpy(ptr, sv.ptr(), sv.len());
   ptr[sv.len()] = '\0';
