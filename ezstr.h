@@ -526,9 +526,9 @@ SplitWhitespace StringView::split_whitespace() const {
 /* --------------- Replace --------------- */
 String StringView::replace(StringView from, StringView to) const {
   assert(!(from == ""));
-  size_t to_div_from_ceil_nonzero =
-      to.len() ? to.len() / from.len() + (to.len() % from.len() != 0) : 1;
-  size_t cap = len() * to_div_from_ceil_nonzero;
+  size_t to_div_from_ceil =
+      to.len() / from.len() + (to.len() % from.len() != 0);
+  size_t cap = len() * to_div_from_ceil;
 
   String ret(cap);
   StringView copy = *this;
