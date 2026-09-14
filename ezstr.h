@@ -20,7 +20,7 @@
 #endif // !EZSTR_HAS_MEMMEM
 #endif // _GNU_SOURCE
 
-#define EZSTR_DEV 1
+#define EZSTR_DEV 0
 #if EZSTR_DEV
 #define EZSTR_IMPLEMENTATION
 #endif
@@ -31,12 +31,16 @@
  */
 
 /* --------------- Declaration + Templates --------------- */
-namespace ezstr {
 
-class String;
-class StringView;
-class SplitWhitespace;
-namespace {
+/* --------------- Deps --------------- */
+/* --------------- Option --------------- */
+#include <functional>
+#include <utility>
+
+#ifndef EZOPTION_H
+#define EZOPTION_H
+namespace ezopt {
+
 template <typename T> class Option;
 template <typename T> class Option {
   bool is_some_;
@@ -59,9 +63,17 @@ public:
   [[nodiscard]] T unwrap_or_else(std::function<T()> fn) && {
     return is_some_ ? std::move(value_) : fn();
   }
-  [[nodiscard]] T clone() const & { return value_; }
 };
-} // namespace
+
+} // namespace ezopt
+#endif // !EZOPTION_H
+/* --------------- /Deps --------------- */
+
+namespace ezstr {
+
+class String;
+class StringView;
+class SplitWhitespace;
 
 class StringView {
   const char *ptr_;
@@ -78,9 +90,9 @@ public:
   [[nodiscard]] bool operator==(const String &other) const;
   [[nodiscard]] bool operator==(const StringView other) const;
 
-  [[nodiscard]] Option<const char *> get(size_t i) const;
+  [[nodiscard]] ezopt::Option<const char *> get(size_t i) const;
   [[nodiscard]] const char &operator[](size_t i) const;
-  [[nodiscard]] Option<StringView> get(size_t i, size_t j) const;
+  [[nodiscard]] ezopt::Option<StringView> get(size_t i, size_t j) const;
   [[nodiscard]] StringView operator()(size_t i, size_t j) const;
 
   void unsafe_set_ptr(const char *ptr);
@@ -128,10 +140,12 @@ public:
   [[nodiscard]] StringView trim_prefix(StringView prefix) const;
   [[nodiscard]] StringView trim_suffix(StringView suffix) const;
 
-  [[nodiscard]] Option<size_t> find(StringView pat) const;
-  [[nodiscard]] Option<size_t> find(std::function<bool(char)> predicate) const;
-  [[nodiscard]] Option<size_t> rfind(StringView pat) const;
-  [[nodiscard]] Option<size_t> rfind(std::function<bool(char)> predicate) const;
+  [[nodiscard]] ezopt::Option<size_t> find(StringView pat) const;
+  [[nodiscard]] ezopt::Option<size_t>
+  find(std::function<bool(char)> predicate) const;
+  [[nodiscard]] ezopt::Option<size_t> rfind(StringView pat) const;
+  [[nodiscard]] ezopt::Option<size_t>
+  rfind(std::function<bool(char)> predicate) const;
 
   [[nodiscard]] bool contains(StringView pat) const;
   [[nodiscard]] bool starts_with(StringView pat) const;
@@ -348,11 +362,12 @@ const char *StringView::rbegin() const { return end(); }
 const char *StringView::rend() const { return begin(); }
 bool StringView::is_empty() const { return len() == 0; }
 bool StringView::is_valid() const { return ptr(); }
-Option<const char *> StringView::get(size_t i) const {
-  return i < len() ? Option(&ptr()[i]) : Option<const char *>();
+ezopt::Option<const char *> StringView::get(size_t i) const {
+  return i < len() ? ezopt::Option(&ptr()[i]) : ezopt::Option<const char *>();
 }
-Option<StringView> StringView::get(size_t i, size_t j) const {
-  return j <= len() && i <= j ? Option((*this)(i, j)) : Option<StringView>();
+ezopt::Option<StringView> StringView::get(size_t i, size_t j) const {
+  return j <= len() && i <= j ? ezopt::Option((*this)(i, j))
+                              : ezopt::Option<StringView>();
 }
 SplitWhitespace::Iterator SplitWhitespace::begin() const {
   return SplitWhitespace::Iterator(sv_.trim_start());
@@ -453,11 +468,11 @@ void String::trim_suffix_mut(StringView suffix) {
 }
 
 /* --------------- Find --------------- */
-Option<size_t> StringView::find(StringView pat) const {
+ezopt::Option<size_t> StringView::find(StringView pat) const {
 #ifdef EZSTR_HAS_MEMMEM
   char *pat_addr = (char *)memmem(ptr(), len(), pat.ptr(), pat.len());
-  return pat_addr ? Option(static_cast<size_t>(pat_addr - ptr()))
-                  : Option<size_t>();
+  return pat_addr ? ezopt::Option(static_cast<size_t>(pat_addr - ptr()))
+                  : ezopt::Option<size_t>();
 #else
   StringView copy = *this;
   while (pat.len() <= copy.len()) {
@@ -466,35 +481,37 @@ Option<size_t> StringView::find(StringView pat) const {
     copy.ptr_++;
     copy.len_--;
   }
-  return Option<size_t>();
+  return ezopt::Option<size_t>();
 #endif
 }
-Option<size_t> StringView::find(std::function<bool(char)> predicate) const {
+ezopt::Option<size_t>
+StringView::find(std::function<bool(char)> predicate) const {
   size_t i = 0;
   for (char c : (*this)) {
     if (predicate(c))
       return i;
     i++;
   }
-  return Option<size_t>();
+  return ezopt::Option<size_t>();
 }
-Option<size_t> StringView::rfind(StringView pat) const {
+ezopt::Option<size_t> StringView::rfind(StringView pat) const {
   StringView copy = *this;
   while (pat.len() <= copy.len()) {
     if (copy.ends_with(pat))
       return copy.len() - pat.len();
     copy.len_--;
   }
-  return Option<size_t>();
+  return ezopt::Option<size_t>();
 }
-Option<size_t> StringView::rfind(std::function<bool(char)> predicate) const {
+ezopt::Option<size_t>
+StringView::rfind(std::function<bool(char)> predicate) const {
   size_t i = len() - 1;
   for (auto c = rbegin(); c != rend(); c++) {
     if (predicate(*c))
       return i;
     i--;
   }
-  return Option<size_t>();
+  return ezopt::Option<size_t>();
 }
 
 /* --------------- Pattern Matching --------------- */
