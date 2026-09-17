@@ -307,7 +307,7 @@ String &String::operator+=(const StringView &other) {
   return *this;
 }
 String &String::operator+=(const String &other) {
-  return (*this) += other.as_str();
+  return *this += other.as_str();
 }
 String::String(String &&str) : sv_(str.sv_), cap_(str.cap_) { str.sv_ = {}; }
 String &String::operator=(const StringView &other) {
@@ -492,7 +492,7 @@ ezopt::Option<size_t> StringView::find(StringView pat) const {
 ezopt::Option<size_t>
 StringView::find(std::function<bool(char)> predicate) const {
   size_t i = 0;
-  for (char c : (*this)) {
+  for (char c : *this) {
     if (predicate(c))
       return i;
     i++;
