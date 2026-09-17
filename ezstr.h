@@ -194,10 +194,29 @@ public:
 
   const StringView *operator->() const;
   const StringView &operator*() const;
-  String &operator=(const StringView &other);
+
+  /**
+   * @warning
+   * Pointer of the returned string is freed for self assignment
+   * e.g. s = std::move(s);
+   */
   String &operator=(String &&other);
+  String &operator=(const StringView &other);
+
+  /**
+   * @warning
+   * Use after free for self assignment
+   * e.g. s += s or s += s.as_str();
+   */
   String &operator+=(const StringView &other);
+
+  /**
+   * @warning
+   * Use after free for self assignment
+   * e.g. s += s or s += s.as_str();
+   */
   String &operator+=(const String &other);
+
   [[nodiscard]] char &operator[](size_t i) const;
   [[nodiscard]] StringView operator()(size_t i, size_t j) const;
   [[nodiscard]] bool operator==(const StringView &other) const;
@@ -211,6 +230,7 @@ public:
   void unsafe_set_ptr(const char *ptr);
   void unsafe_set_len(size_t len);
   void unsafe_set_sv(StringView sv);
+
   /**
    * @warning
    * Checks individual characters, for removing suffixes use trim_suffix_mut
@@ -269,11 +289,6 @@ StringView SplitWhitespace::Iterator::operator*() const {
                      })
                      .unwrap_or(copy.len()));
 }
-/**
- * @warning
- * Use after free for self assignment
- * e.g. s += s or s += s.as_str();
- */
 String &String::operator+=(const StringView &other) {
   assert(ptr_mut() != other.ptr());
   size_t old_len = as_str().len();
@@ -291,11 +306,6 @@ String &String::operator+=(const StringView &other) {
   ptr_mut()[len] = '\0';
   return *this;
 }
-/**
- * @warning
- * Use after free for self assignment
- * e.g. s += s or s += s.as_str();
- */
 String &String::operator+=(const String &other) {
   return (*this) += other.as_str();
 }
@@ -312,11 +322,6 @@ String &String::operator=(const StringView &other) {
 }
 String::String(const char *ptr, size_t len, size_t cap)
     : sv_(ptr, len), cap_(cap) {}
-/**
- * @warning
- * Pointer of the returned string is freed for self assignment
- * e.g. s = std::move(s);
- */
 String &String::operator=(String &&other) {
   assert(ptr_mut() != other->ptr());
   free(ptr_mut());
