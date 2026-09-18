@@ -22,7 +22,7 @@
 #endif // !EZSTR_HAS_MEMMEM
 #endif // _GNU_SOURCE
 
-#define EZSTR_DEV 1
+#define EZSTR_DEV 0
 #if EZSTR_DEV
 #define EZSTR_IMPLEMENTATION
 #endif
