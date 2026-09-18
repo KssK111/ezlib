@@ -44,6 +44,7 @@ class StringView {
   size_t len_;
 
 public:
+  StringView();
   StringView(const char *ptr, size_t len);
   StringView(const StringView &other);
   StringView(const char *ptr);
@@ -212,6 +213,7 @@ namespace ezstr {
 /* --------------- Implementation --------------- */
 
 /* --------------- Ctors + Operators --------------- */
+StringView::StringView() : ptr_(nullptr) {}
 StringView::StringView(const char *ptr, size_t len) : ptr_(ptr), len_(len) {}
 StringView::StringView(const StringView &other)
     : ptr_(other.ptr_), len_(other.len_) {}
