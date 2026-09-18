@@ -22,7 +22,7 @@
 #endif // !EZSTR_HAS_MEMMEM
 #endif // _GNU_SOURCE
 
-#define EZSTR_DEV 0
+#define EZSTR_DEV 1
 #if EZSTR_DEV
 #define EZSTR_IMPLEMENTATION
 #endif
@@ -259,10 +259,8 @@ String &String::operator+=(const StringView &other) {
   size_t len = old_len + other.len();
   if (len > cap()) {
     cap_ = 2 * (len);
-    char *ptr = (char *)malloc(cap() + 1);
-    memcpy(ptr, as_str().ptr(), old_len);
-    free(ptr_mut());
-    unsafe_set_ptr(ptr);
+    // used realloc for simplicity, but previos solution MAY be faster
+    unsafe_set_ptr((char *)realloc(ptr_mut(), cap() + 1));
   }
   unsafe_set_len(len);
   // other.ptr() might be freed if this == other
@@ -276,10 +274,13 @@ String &String::operator+=(const String &other) {
 String::String(String &&str) : sv_(str.sv_), cap_(str.cap_) { str.sv_ = {}; }
 String &String::operator=(const StringView &other) {
   if (other.len() > cap()) {
+    // realloc is not a good simplification of the code here
+    // unnecessary memcpy - always, no new allocation - sometimes
     free(ptr_mut());
     cap_ = other.len();
-    sv_ = {(char *)malloc(cap() + 1), cap()};
+    unsafe_set_ptr((char *)malloc(cap() + 1));
   }
+  unsafe_set_len(other.len());
   memcpy(ptr_mut(), other.ptr(), other.len());
   ptr_mut()[other.len()] = '\0';
   return *this;
