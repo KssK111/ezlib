@@ -44,7 +44,6 @@ class StringView {
   size_t len_;
 
 public:
-  StringView();
   StringView(const char *ptr, size_t len);
   StringView(const StringView &other);
   StringView(const char *ptr);
@@ -213,7 +212,6 @@ namespace ezstr {
 /* --------------- Implementation --------------- */
 
 /* --------------- Ctors + Operators --------------- */
-StringView::StringView() : ptr_(nullptr) {}
 StringView::StringView(const char *ptr, size_t len) : ptr_(ptr), len_(len) {}
 StringView::StringView(const StringView &other)
     : ptr_(other.ptr_), len_(other.len_) {}
@@ -271,7 +269,9 @@ String &String::operator+=(const StringView &other) {
 String &String::operator+=(const String &other) {
   return *this += other.as_str();
 }
-String::String(String &&str) : sv_(str.sv_), cap_(str.cap_) { str.sv_ = {}; }
+String::String(String &&str) : sv_(str.sv_), cap_(str.cap_) {
+  str.unsafe_set_ptr(nullptr);
+}
 String &String::operator=(const StringView &other) {
   if (other.len() > cap()) {
     // realloc is not a good simplification of the code here
@@ -292,7 +292,7 @@ String &String::operator=(String &&other) {
   free(ptr_mut());
   sv_ = other.sv_;
   cap_ = other.cap();
-  other.sv_ = {};
+  other.unsafe_set_ptr(nullptr);
   return *this;
 }
 String::String() : String(INIT_CAP) {}
